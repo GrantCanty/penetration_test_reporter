@@ -4,5 +4,7 @@ ideas.md
 main.ipynb
 test.md
 pen_writer/__pycache__
+pen_writer/testing.ipynb
 tests/__pycache__
 Nettacker
+temp_outputs/*
