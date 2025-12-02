@@ -12,10 +12,11 @@ host_output_dir.mkdir(parents=True, exist_ok=True)
 
 def run_scanner(target, output_dir = 'temp'):
     new_folder = Path(host_output_path, output_dir)
+    print(f'folder path: {new_folder}')
     new_folder.mkdir(parents=True, exist_ok=True)
 
-    # port_scan(target, output_dir)
-    subdomain_scan(target, output_dir)
+    port_scan(target, str(new_folder))
+    subdomain_scan(target, str(new_folder))
 
 # scans for open ports. returns results as json
 def port_scan(target, output_dir):
@@ -68,36 +69,6 @@ def subdomain_scan(target, output_dir):
         return False
     except Exception as e:
         print(f'error occurred when running: {e}')
-        return False
+        return False       
 
-def subdomain_scan_test(target):
-    report_file_name = f'{target}_subdomain_scan'
-    try:
-        output_b = client.containers.run(
-            image='nettacker',
-            entrypoint='nettacker',
-            command=f"-i {target} -d -s -m http_status_scan",
-            remove=True,
-            network_mode='host',
-            privileged=True,
-            volumes={
-                host_output_path: {'bind': '/temp_outputs', 'mode': 'rw'}
-                }
-        )
-
-        print(output_b.decode('utf-8'))
-
-        return True
-    except docker.errors.ContainerError as e:
-        # non-zero exit statuses
-        print(f'Scan failed with exit code: {e.exit_status}')
-        print(f"Container logs (STDOUT/STDERR):\n{e.stderr.decode('utf-8')}")
-        return False
-    except docker.errors.ImageNotFound:
-        print(f"'nettacker' image not found")
-        return False
-    except Exception as e:
-        print(f'error occurred when running: {e}')
-        return False        
-
-run_scanner('http://ctf10.root-me.org/')
+run_scanner('http://ctf10.root-me.org/',)
