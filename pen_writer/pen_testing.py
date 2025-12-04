@@ -1,5 +1,6 @@
 import docker
 from pathlib import Path
+from datetime import datetime
 
 
 client = docker.from_env()
@@ -10,9 +11,8 @@ host_output_path = str(host_output_dir)
 
 host_output_dir.mkdir(parents=True, exist_ok=True)
 
-def run_scanner(target, output_dir = 'temp'):
+def run_scanner(target, output_dir = datetime.today().strftime('%Y_%m_%d_%H_%M_%S')):
     new_folder = Path(host_output_path, output_dir)
-    print(f'folder path: {new_folder}')
     new_folder.mkdir(parents=True, exist_ok=True)
 
     port_scan(target, str(new_folder))
@@ -23,26 +23,26 @@ def port_scan(target, output_dir):
     try:
         client.containers.run(
             image='nettacker',
-            command=f"-i {target} -m port_scan -o /temp_outputs/port_scan.json",
+            command=f"-i {target} -m port_scan -o /{output_dir}/port_scan.json",
             remove=True,
             network_mode='host',
             privileged=True,
             volumes={
-                output_dir: {'bind': '/temp_outputs', 'mode': 'rw'}
+                output_dir: {'bind': f'/{output_dir}', 'mode': 'rw'}
                 }
         )
 
-        return True
+        #return True
     except docker.errors.ContainerError as e:
         # non-zero exit statuses
         print(f'Scan failed with exit code: {e.exit_status}')
-        print(f"Container logs (STDOUT/STDERR):\n{e.stderr.decode('utf-8')}")
+        raise(f"Container logs (STDOUT/STDERR):\n{e.stderr.decode('utf-8')}")
         return False
     except docker.errors.ImageNotFound:
-        print(f"'nettacker' image not found")
+        raise(f"'nettacker' image not found")
         return False
     except Exception as e:
-        print(f'error occurred when running: {e}')
+        raise(f'error occurred when running: {e}')
         return False
   
 def subdomain_scan(target, output_dir):
@@ -58,17 +58,17 @@ def subdomain_scan(target, output_dir):
                 }
         )
 
-        return True
+        #return True
     except docker.errors.ContainerError as e:
         # non-zero exit statuses
         print(f'Scan failed with exit code: {e.exit_status}')
-        print(f"Container logs (STDOUT/STDERR):\n{e.stderr.decode('utf-8')}")
-        return False
+        raise(f"Container logs (STDOUT/STDERR):\n{e.stderr.decode('utf-8')}")
+        #return False
     except docker.errors.ImageNotFound:
-        print(f"'nettacker' image not found")
-        return False
+        raise(f"'nettacker' image not found")
+        #return False
     except Exception as e:
-        print(f'error occurred when running: {e}')
-        return False       
+        raise(f'error occurred when running: {e}')
+        #return False       
 
-run_scanner('http://ctf10.root-me.org/',)
+run_scanner('http://localhost:4280')
