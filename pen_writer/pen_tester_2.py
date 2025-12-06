@@ -2,6 +2,7 @@ import socket
 import validators
 from datetime import datetime
 from pathlib import Path
+import subprocess
 
 
 host_output_dir = Path(Path(__file__).resolve().parent.parent, 'temp_outputs')
@@ -21,6 +22,9 @@ def scanner(target, output_dir = datetime.today().strftime('%Y_%m_%d_%H_%M_%S'))
                 f.write(f'{target} ip address is: {ip_addr[0]}')
     else:
         ip_addr = target
+
+    nmap_A_output_file = 'nmap_A_scan_output.xml'
+    nmamp_A = subprocess.run(['nmap', '-A', '-oX', f'{host_output_dir / new_folder / nmap_A_output_file}', ip_addr], capture_output=True, check=True, text=True)
         
 
 
