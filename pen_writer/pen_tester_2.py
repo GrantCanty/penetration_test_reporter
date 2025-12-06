@@ -6,6 +6,10 @@ import subprocess
 from IPy import IP
 import xml.etree.ElementTree as ET
 
+from pen_writer import (
+    TARGET_ERROR, RESPONSE_ERROR, SUCCESS, __app_name__
+)
+
 
 host_output_dir = Path(Path(__file__).resolve().parent.parent, 'temp_outputs')
 host_output_path = str(host_output_dir)
@@ -19,7 +23,7 @@ def IPValidation(target):
     except Exception as e:
         return False
 
-def scanner(target, output_dir = datetime.today().strftime('%Y_%m_%d_%H_%M_%S')):
+def scanner(target, port = None, output_dir = datetime.today().strftime('%Y_%m_%d_%H_%M_%S')):
     new_folder = Path(host_output_path, output_dir)
     new_folder.mkdir(parents=True, exist_ok=True)
     
@@ -33,19 +37,29 @@ def scanner(target, output_dir = datetime.today().strftime('%Y_%m_%d_%H_%M_%S'))
         ip_addr = target
     else:
         print(f'target given is not valid: {target}')
-        return
+        return None, TARGET_ERROR
 
-    #nmap_A_file_name = 'nmap_A_scan_output.xml'
-    #nmap_A_file_path = f'{host_output_dir / new_folder / nmap_A_file_name}'
-    nmap_A_file_path = '/Users/cheoso/ai_projects/tw3_internship/temp_outputs/2025_12_06_17_41_09/nmap_A_scan_output.xml'
-    #print(['nmap', '-A', '-oX', f'{host_output_dir / new_folder / nmap_A_output_file}', ip_addr])
-    #nmamp_A = subprocess.run(['nmap', '-A', '-oX', nmap_A_file_path, ip_addr], capture_output=True, check=True, text=True)
+    nmap_A_file_name = 'nmap_A_scan_output.xml'
+    nmap_A_file_path = f'{host_output_dir / new_folder / nmap_A_file_name}'
+
+    try:
+        if port == None:
+            subprocess.run(['nmap', '-A', '-oX', nmap_A_file_path, ip_addr], capture_output=True, check=True, text=True)
+        else:
+            subprocess.run(['nmap', '-A', '-p', port, '-oX', nmap_A_file_path, ip_addr], capture_output=True, check=True, text=True)
+    except subprocess.CalledProcessError as e:
+        print(f'Error when nmap request. Response Code: {e.returncode}')
+        return None, RESPONSE_ERROR
+    except Exception as e:
+        print(f'Error when nmap request: {e}')
+        return None, RESPONSE_ERROR
+
+    #nmap_A_file_path = '/Users/cheoso/ai_projects/tw3_internship/temp_outputs/2025_12_06_17_41_09/nmap_A_scan_output.xml'
     open_ports = xml_scan(nmap_A_file_path)
-    #print(open_ports)
     for port in open_ports:
         print(port, open_ports[port])
         
-
+    return SUCCESS, None
 
 def ip_lookup(addr):
 
@@ -68,7 +82,6 @@ def xml_scan(xml_file_path):
 
     if host_elm is not None:
         address = host_elm.find('address').get('addr')
-        print(address)
         ports_element = host_elm.find('ports')
         if ports_element is not None:
             
@@ -88,4 +101,4 @@ def xml_scan(xml_file_path):
             
     return ports
 
-scanner('http://scanme.nmap.org')
+#scanner('http://scanme.nmap.org')
