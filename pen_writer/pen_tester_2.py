@@ -148,11 +148,12 @@ def get_port_and_command(port, open_ports, script_map):
 def run_nmap_sync(ip_addr, port, command, output_dir):
     file_name = f'{port}_{command}.xml'
     file_path = f'{output_dir / file_name}'
+    parent_dir = Path(__file__).resolve().parent.parent
     try:
         if command != 'ssh-brute':
             subprocess.run(['nmap', '--script', command, '-p', port, '-oX', file_path, ip_addr], capture_output=True, check=True, text=True)
         else:
-            subprocess.run(['nmap', '-p', port, '-oX', file_path, '--script', command, '--script-args', 'userdb=../credentials/cirt-default-usernames.txt,passdb=../credentials/Pwdb_top-1000.txt', ip_addr], capture_output=True, check=True, text=True)
+            subprocess.run(['nmap', '-p', port, '-oX', file_path, '--script', command, '--script-args', f'userdb={parent_dir /"credentials/cirt-default-usernames.txt"},passdb={parent_dir /"credentials/Pwdb_top-1000.txt"}', ip_addr], capture_output=True, check=True, text=True)
     except Exception:
         return {'file_path': file_path, 'port': port, 'command': command, 'error': RESPONSE_ERROR}
 
