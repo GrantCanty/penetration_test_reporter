@@ -5,6 +5,9 @@ from pathlib import Path
 import subprocess
 from IPy import IP
 import xml.etree.ElementTree as ET
+import asyncio
+from functools import partial
+from concurrent.futures import ThreadPoolExecutor
 
 from pen_writer import (
     TARGET_ERROR, RESPONSE_ERROR, SUCCESS, __app_name__
@@ -29,7 +32,7 @@ def IPValidation(target):
 # scans target and port if given. logs results to temp_outputs in a unique directory
 def scanner(target, port = None, output_dir = datetime.today().strftime('%Y_%m_%d_%H_%M_%S')):
     # create unique directory to save logs to
-    '''new_folder = Path(host_output_path, output_dir)
+    new_folder = Path(host_output_path, output_dir)
     new_folder.mkdir(parents=True, exist_ok=True)
     
     # check if target is a valid url or IP address
@@ -63,7 +66,7 @@ def scanner(target, port = None, output_dir = datetime.today().strftime('%Y_%m_%
         return None, RESPONSE_ERROR
     except Exception as e:
         print(f'Error when nmap request: {e}')
-        return None, RESPONSE_ERROR'''
+        return None, RESPONSE_ERROR
     
     # common services and commands to try on these services
     NSE_SCRIPT_MAPPING = {
@@ -85,6 +88,15 @@ def scanner(target, port = None, output_dir = datetime.today().strftime('%Y_%m_%
         item for port in open_ports
         for item in get_port_and_command(port, open_ports, NSE_SCRIPT_MAPPING)
     ]
+
+    save_dir = host_output_dir / new_folder
+
+    res = asyncio.run(run_nmap_async(ip_addr, commands, save_dir))
+    print(res)
+
+
+
+
 
         
     return SUCCESS, None
@@ -133,5 +145,33 @@ def get_port_and_command(port, open_ports, script_map):
     service = open_ports[port]['service']
     if service in script_map:
         yield from ((port, command) for command in script_map[service])
+
+def run_nmap_sync(ip_addr, port, command, output_dir):
+    file_name = f'{port}_command.txt'
+    subprocess(['nmap', '--script', command, '-p', port, '-oX', f'{output_dir / file_name}', ip_addr])
+    pass
+
+async def async_scan_worker(executor, ip_addr, port, command, output_dir):
+    # run_in_executor offloads the synchronous subprocess call to a separate thread
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(
+        executor,
+        partial(run_nmap_sync, ip_addr, port, command, output_dir)
+    )
+
+async def run_nmap_async(ip_addr, commands, output_dir):
+    results = []
+
+    with ThreadPoolExecutor(max_workers=5) as executor:
+        tasks = [
+            async_scan_worker(executor, ip_addr, port, command, output_dir)
+            for port, command in commands
+        ]
+        
+        # gather results as they complete
+        completed_results = await asyncio.gather(*tasks)
+        results.extend(completed_results)
+        
+    return results
 
 #scanner('http://scanme.nmap.org')
