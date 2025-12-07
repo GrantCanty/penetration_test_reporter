@@ -72,7 +72,7 @@ def scanner(target, port = None, output_dir = datetime.today().strftime('%Y_%m_%
     NSE_SCRIPT_MAPPING = {
         'http': ['http-methods', 'http-enum', 'http-csrf'],
         'ssl/http': ['ssl-enum-ciphers', 'http-methods', 'http-enum'],
-        'ssh': ['ssh-auth-methods', 'ssh-hostkey', 'ssh-enum-users'],
+        'ssh': ['ssh-auth-methods', 'ssh-hostkey', 'ssh-enum-users', 'ssh-brute'],
         'smtp': ['smtp-commands', 'smtp-enum-users', 'smtp-vuln-cve2010-4344'],
         'ftp': ['ftp-anon', 'ftp-brute'],
         'mysql': ['mysql-info', 'mysql-brute'],
@@ -90,7 +90,6 @@ def scanner(target, port = None, output_dir = datetime.today().strftime('%Y_%m_%
     ]
 
     save_dir = host_output_dir / new_folder
-
     res = asyncio.run(run_nmap_async(ip_addr, commands, save_dir))
     print(res)
 
@@ -150,11 +149,14 @@ def run_nmap_sync(ip_addr, port, command, output_dir):
     file_name = f'{port}_{command}.xml'
     file_path = f'{output_dir / file_name}'
     try:
-        subprocess.run(['nmap', '--script', command, '-p', port, '-oX', file_path, ip_addr], capture_output=True, check=True, text=True)
+        if command != 'ssh-brute':
+            subprocess.run(['nmap', '--script', command, '-p', port, '-oX', file_path, ip_addr], capture_output=True, check=True, text=True)
+        else:
+            subprocess.run(['nmap', '-p', port, '--script', command, '--script-args', 'userdb=../credentials/cirt-default-usernames.txt,passdb=../credentials/Pwdb_top-1000.txt', ip_addr], capture_output=True, check=True, text=True)
     except Exception:
-        return {'file_path': file_name, 'port': port, 'command': command, 'error': RESPONSE_ERROR}
+        return {'file_path': file_path, 'port': port, 'command': command, 'error': RESPONSE_ERROR}
 
-    return {'file_path': file_name, 'port': port, 'command': command, 'error': None}
+    return {'file_path': file_path, 'port': port, 'command': command, 'error': None}
 
 async def async_scan_worker(executor, ip_addr, port, command, output_dir):
     # run_in_executor offloads the synchronous subprocess call to a separate thread
