@@ -5,6 +5,7 @@ typer==0.3.2
 #docker
 
 #python-nmap
+openai
 validators
 IPy
 xml-python
