@@ -41,14 +41,19 @@ def scanner(target, parent_path, port = None, output_dir = datetime.today().strf
     nmap_A_file_name = 'nmap_A_scan_output.xml'
     nmap_A_file_path = f'{parent_path / new_folder / nmap_A_file_name}'
 
+    nmap_sV_sC_file_name = 'nmap_sV_sC_output.xml'
+    nmap_sV_sC_file_path = f'{parent_path / new_folder / nmap_sV_sC_file_name}'
+
     # try scan with or without port, depending if it was given
-    print(['nmap', '-A', '-oX', nmap_A_file_path, ip_addr])
+    #print(['nmap', '-A', '-oX', nmap_A_file_path, ip_addr])
     try:
         print('Performing "nmap -A" scan')
         if port == None:
             subprocess.run(['nmap', '-A', '-oX', nmap_A_file_path, ip_addr], capture_output=True, check=True, text=True)
+            subprocess.run(['nmap', '-oX', nmap_sV_sC_file_path, '-sV', '-sC', ip_addr], capture_output=True, check=True, text=True)
         else:
-            subprocess.run(['nmap', '-A', '-p', port, '-oX', nmap_A_file_path, ip_addr], capture_output=True, check=True, text=True)
+            subprocess.run(['nmap', '-A', '-p', str(port), '-oX', nmap_A_file_path, ip_addr], capture_output=True, check=True, text=True)
+            subprocess.run(['nmap', '-oX', nmap_sV_sC_file_path, '-p', str(port), '-sV', '-sC', ip_addr], capture_output=True, check=True, text=True)
     except subprocess.CalledProcessError as e:
         print(f'Error when nmap request. Response Code: {e.returncode}')
         return None, RESPONSE_ERROR
@@ -80,7 +85,7 @@ def scanner(target, parent_path, port = None, output_dir = datetime.today().strf
     save_dir = parent_path / new_folder
     # run further nmap command async to speed up run time
     res = asyncio.run(run_nmap_async(ip_addr, commands, save_dir))
-    print(res)
+    # print(res)
 
     return SUCCESS, None
 
@@ -201,8 +206,8 @@ def run_nmap_sync(ip_addr, port, command, output_dir):
     try:
         if command != 'ssh-brute': # different command for ssh-brute
             subprocess.run(['nmap', '--script', command, '-p', port, '-oX', file_path, ip_addr], capture_output=True, check=True, text=True)
-        #else:
-            #subprocess.run(['nmap', '-p', port, '-oX', file_path, '--script', command, '--script-args', f'userdb={parent_dir /"credentials/cirt-default-usernames.txt"},passdb={parent_dir /"credentials/Pwdb_top-1000.txt"}', ip_addr], capture_output=True, check=True, text=True)
+        else:
+            subprocess.run(['nmap', '-p', port, '-oX', file_path, '--script', command, '--script-args', f'userdb={parent_dir /"credentials/cirt-default-usernames.txt"},passdb={parent_dir /"credentials/Pwdb_top-1000.txt"}', ip_addr], capture_output=True, check=True, text=True)
     except Exception:
         print(f'Error in "nmap --script {command} on port {port}')
         return {'file_path': file_path, 'port': port, 'command': command, 'error': RESPONSE_ERROR}

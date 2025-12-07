@@ -1,8 +1,9 @@
 from pathlib import Path
 from datetime import datetime
 import os
-
 from openai import OpenAI
+from markdown_pdf import MarkdownPdf, Section
+
 
 
 #parent_path = Path(Path(__file__).resolve().parent.parent, 'temp_outputs')
@@ -12,7 +13,8 @@ client = OpenAI(base_url="http://localhost:11434/v1", api_key="EMPTY")
 
 def chat_wrapper(messages, **kwargs):
     response = client.chat.completions.create(
-        model='qwen3:4B-instruct',
+        #model='qwen3:4B-instruct',
+        model='qwen3:8B',
         messages=messages,
         **kwargs
     )
@@ -24,13 +26,28 @@ def summarize(parent_path, output_dir):
     if err:
         return None, err
     
-    messages = [{'role': 'system', 'content': 'You are a cybersecurity expert tasked in writing 1 page pdf reports that highlight security vulnerabilities from various penetration testing scans. Your job is to give clear output about the main risks of a site from multiple completed scans. List found vulnerabilities from most to least sever. Your reports must be formatted like an official report. No questions should be asked and no emojis should be used. Only stick to facts. Your reports will be used in the industry by other professionals. You will receive a dictionary with the file name, usually referring to the port number and scan that was completed as well as the contents of that scan in xml format.'},
-                {'role': 'user', 'content': str(files)}]
-    print(messages)
+    system_prompt = '''Your name is pen writer and you are a cybersecurity expert. Your role is to write concise 1 page 
+    reports highlighting security vulnerabilities from various penetration testing scans. These reports are given to 
+    outside regulatory agencies who have no decision making power over the target. because of this, do not give 
+    reccomendations about what to fix. Only talk about the issues on the site and the effect of the vulnerabilities. 
+    If a scan does not return a vulnerability, there is no need to mention it. These reports needs to be concise 
+    for maximum impact. You will receive a dictionary with the file name, usually referring to the port number and 
+    scan that was completed as well as the contents of that scan in xml format. Your final output must be complete 
+    and final. DO NOT include any conversational language, questions, follow-up prompts, or suggestions for the next 
+    step. Only output the markdown report content. Stop output immediately after the report content ends.'''
+    user_prompt = f'User query: Give a 1 page report in markdown covering the main security issues found from the documents provided. Never use emojis or ask for any questions\nUser Content: {str(files)}'
+    
+    messages = [{'role': 'system', 'content': system_prompt},
+                {'role': 'user', 'content': user_prompt}]
     
     response = chat_wrapper(messages)
 
-    print(response)
+    dt = datetime.today().strftime('%Y_%m_%d_%H_%M_%S')
+    pdf = MarkdownPdf()
+    pdf.meta["title"] = 'Title'
+    pdf.add_section(Section(response, toc=False))
+    print(f'writing file: output_{dt}.pdf')
+    pdf.save(f'output_{dt}.pdf')
     
 
     return
@@ -40,7 +57,7 @@ def get_files(parent_path, output_dir):
     
     file_dict = {}
     for file in files:
-        print(file)
+        #print(file)
         file_content = open( f'{parent_path / output_dir / file}' )
         file_dict[file] = file_content.read()
         file_content.close()

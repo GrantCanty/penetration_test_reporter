@@ -9,3 +9,5 @@ openai
 validators
 IPy
 xml-python
+#pypdf
+markdown-pdf
