@@ -45,7 +45,7 @@ def scanner(target, port = None, output_dir = datetime.today().strftime('%Y_%m_%
         print(f'Error when nmap request. Response Code: {e.returncode}')
         return None, RESPONSE_ERROR
     except Exception as e:
-        print(f'Error when nmap request: {e}')
+        print(f'Error with nmap request: {e}')
         return None, RESPONSE_ERROR
     
     # common services and commands to try on these services
@@ -102,6 +102,7 @@ def ip_lookup(addr):
         ip_list.append(result[-1][0])
         ip_list = list(set(ip_list))
 
+    print('Retreived IP address from URL')
     return ip_list[0]
 
 
@@ -111,6 +112,7 @@ def IPValidation(target):
     print('Verifying IP address format')
     try:
         IP(target)
+        print('IP address conforms to standards')
         return True
     except Exception:
         return False
@@ -167,11 +169,13 @@ def run_nmap_sync(ip_addr, port, command, output_dir):
     try:
         if command != 'ssh-brute': # different command for ssh-brute
             subprocess.run(['nmap', '--script', command, '-p', port, '-oX', file_path, ip_addr], capture_output=True, check=True, text=True)
-        else:
-            subprocess.run(['nmap', '-p', port, '-oX', file_path, '--script', command, '--script-args', f'userdb={parent_dir /"credentials/cirt-default-usernames.txt"},passdb={parent_dir /"credentials/Pwdb_top-1000.txt"}', ip_addr], capture_output=True, check=True, text=True)
+        #else:
+            #subprocess.run(['nmap', '-p', port, '-oX', file_path, '--script', command, '--script-args', f'userdb={parent_dir /"credentials/cirt-default-usernames.txt"},passdb={parent_dir /"credentials/Pwdb_top-1000.txt"}', ip_addr], capture_output=True, check=True, text=True)
     except Exception:
+        print(f'Error in "nmap --script {command} on port {port}')
         return {'file_path': file_path, 'port': port, 'command': command, 'error': RESPONSE_ERROR}
 
+    print(f'Finished "nmap --script {command} on port {port}')
     return {'file_path': file_path, 'port': port, 'command': command, 'error': None}
 
 
@@ -187,7 +191,8 @@ async def async_scan_worker(executor, ip_addr, port, command, output_dir):
 async def run_nmap_async(ip_addr, commands, output_dir):
     results = []
 
-    with ThreadPoolExecutor(max_workers=5) as executor:
+    executor = ThreadPoolExecutor(max_workers=5)
+    try:
         tasks = [
             async_scan_worker(executor, ip_addr, port, command, output_dir)
             for port, command in commands
@@ -196,6 +201,9 @@ async def run_nmap_async(ip_addr, commands, output_dir):
         # gather results as they complete
         completed_results = await asyncio.gather(*tasks)
         results.extend(completed_results)
+    
+    finally:
+        executor.shutdown(wait=True)
         
     return results
 
