@@ -80,7 +80,7 @@ def scanner(target, port = None, output_dir = datetime.today().strftime('%Y_%m_%
     }
 
     # read open ports from nmap -A command
-    nmap_A_file_path = '/Users/cheoso/ai_projects/tw3_internship/temp_outputs/2025_12_06_17_41_09/nmap_A_scan_output.xml' # only used for testing
+    # nmap_A_file_path = '/Users/cheoso/ai_projects/tw3_internship/temp_outputs/2025_12_06_17_41_09/nmap_A_scan_output.xml' # only used for testing
     open_ports = xml_scan(nmap_A_file_path)
     
     # commands to perform for each port using its service
@@ -148,8 +148,13 @@ def get_port_and_command(port, open_ports, script_map):
 
 def run_nmap_sync(ip_addr, port, command, output_dir):
     file_name = f'{port}_{command}.xml'
-    subprocess.run(['nmap', '--script', command, '-p', port, '-oX', f'{output_dir / file_name}', ip_addr], capture_output=True, check=True, text=True)
-    pass
+    file_path = f'{output_dir / file_name}'
+    try:
+        subprocess.run(['nmap', '--script', command, '-p', port, '-oX', file_path, ip_addr], capture_output=True, check=True, text=True)
+    except Exception:
+        return {'file_path': file_name, 'port': port, 'command': command, 'error': RESPONSE_ERROR}
+
+    return {'file_path': file_name, 'port': port, 'command': command, 'error': None}
 
 async def async_scan_worker(executor, ip_addr, port, command, output_dir):
     # run_in_executor offloads the synchronous subprocess call to a separate thread
