@@ -3,6 +3,8 @@ import typer
 from pen_writer import __app_name__, __version__
 from pathlib import Path
 import pen_writer.pen_tester_2
+from datetime import datetime
+import pen_writer.summarizer
 
 from pen_writer import (
     ERRORS, SUCCESS, __app_name__, __version__
@@ -16,14 +18,19 @@ def scan(
     target: str,
     port: Optional[int] = typer.Option(None, "--port", "-p")
 ) -> None:
+    parent_path = Path(Path(__file__).resolve().parent.parent, 'temp_outputs')
+    output_dir = datetime.today().strftime('%Y_%m_%d_%H_%M_%S')
+    
     if port is not None:
-        res, err = pen_writer.pen_tester_2.scanner(target, port)
+        res, err = pen_writer.pen_tester_2.scanner(target, parent_path, port, output_dir)
     else:
-        res, err = pen_writer.pen_tester_2.scanner(target)
+        res, err = pen_writer.pen_tester_2.scanner(target, parent_path, output_dir=output_dir)
 
     if err:
         typer.secho(f'Error: {ERRORS[err]}')
         raise typer.Exit(1)
+    
+    pen_writer.summarizer.get_files(parent_path, output_dir)
 
 def _version_callback(value: bool) -> None:
     if value:

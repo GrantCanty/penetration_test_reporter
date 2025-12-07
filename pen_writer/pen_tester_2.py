@@ -13,28 +13,36 @@ from pen_writer import (
     TARGET_ERROR, RESPONSE_ERROR, SUCCESS, __app_name__
 )
 
-# create temp_outputs folder path for logging results
+'''# create temp_outputs folder path for logging results
 host_output_dir = Path(Path(__file__).resolve().parent.parent, 'temp_outputs')
 host_output_path = str(host_output_dir)
 
 # create temp_outputs folder if it does not exist
-host_output_dir.mkdir(parents=True, exist_ok=True)
+host_output_dir.mkdir(parents=True, exist_ok=True)'''
 
 # scans target and port if given. logs results to temp_outputs in a unique directory
-def scanner(target, port = None, output_dir = datetime.today().strftime('%Y_%m_%d_%H_%M_%S')):
+def scanner(target, parent_path, port = None, output_dir = datetime.today().strftime('%Y_%m_%d_%H_%M_%S')):
+    # create temp_outputs folder path for logging results
+    #host_output_dir = Path(Path(__file__).resolve().parent.parent, 'temp_outputs')
+    host_output_path = str(parent_path)
+
+    # create temp_outputs folder if it does not exist
+    parent_path.mkdir(parents=True, exist_ok=True)
+    
     # create unique directory to save logs to
     new_folder = Path(host_output_path, output_dir)
     new_folder.mkdir(parents=True, exist_ok=True)
     
     # check if target is a valid url or IP address
-    ip_addr, err = validate_target(target, new_folder)
+    ip_addr, err = validate_target(target, parent_path, new_folder)
 
     # 1st scan: nmap -A -oX directory ip_addr (optional: -p port )
     # create file name and file path
     nmap_A_file_name = 'nmap_A_scan_output.xml'
-    nmap_A_file_path = f'{host_output_dir / new_folder / nmap_A_file_name}'
+    nmap_A_file_path = f'{parent_path / new_folder / nmap_A_file_name}'
 
     # try scan with or without port, depending if it was given
+    print(['nmap', '-A', '-oX', nmap_A_file_path, ip_addr])
     try:
         print('Performing "nmap -A" scan')
         if port == None:
@@ -69,20 +77,27 @@ def scanner(target, port = None, output_dir = datetime.today().strftime('%Y_%m_%
         for item in get_port_and_command(port, open_ports, NSE_SCRIPT_MAPPING)
     ]
 
-    save_dir = host_output_dir / new_folder
+    save_dir = parent_path / new_folder
     # run further nmap command async to speed up run time
     res = asyncio.run(run_nmap_async(ip_addr, commands, save_dir))
     print(res)
 
     return SUCCESS, None
 
-def validate_target(target, folder):
-    if validators.url(target):
+def validate_target(target, parent_path, folder):
+    original_target = target.strip()
+    if not original_target.startswith(('http://', 'https://', 'ftp://')):
+        target_for_validation = 'http://' + original_target
+    else:
+        target_for_validation = original_target
+    
+    if validators.url(target_for_validation):
         # if valid url, return the ip address
-        ip_addr = ip_lookup(target)
+        hostname = original_target.split('://', 1)[-1].split('/')[0]
+        ip_addr = ip_lookup(hostname)
         if ip_addr is not None:
             # log the original url and its ip address
-            with open( host_output_dir / folder / 'ip_scan.txt', 'a') as f:
+            with open( parent_path / folder / 'ip_scan.txt', 'a') as f:
                 f.write(f'{target} ip address is: {ip_addr}')
             return ip_addr, None
         return None, TARGET_ERROR
@@ -97,13 +112,30 @@ def validate_target(target, folder):
 def ip_lookup(addr):
     print('Getting IP address of URL')
     ip_list = []
-    ais = socket.getaddrinfo(addr, 0,0,0,0)
-    for result in ais:
-        ip_list.append(result[-1][0])
-        ip_list = list(set(ip_list))
+    
+    # getaddrinfo expects (hostname, port, ...)
+    # port is set to 0, which means any port is acceptable
+    # The last 4 zeros are for family, type, proto, and flags, set to defaults
+    try:
+        ais = socket.getaddrinfo(addr, 0, 0, 0, 0)
+    except socket.gaierror as e:
+        # Better error handling for DNS failure
+        print(f"Error resolving address: {addr}. Reason: {e}")
+        return None
 
-    print('Retreived IP address from URL')
-    return ip_list[0]
+    for result in ais:
+        # result[-1][0] extracts the IP address from the socket address tuple
+        ip_list.append(result[-1][0])
+    
+    # Use a set to get unique IPs, then convert back to a list
+    ip_list = list(set(ip_list))
+
+    print(f'Retrieved {len(ip_list)} unique IP address(es) for {addr}')
+    
+    # Return the first IP if found
+    if ip_list:
+        return ip_list[0]
+    return None
 
 
 # checks to see if target arg is an IP address
