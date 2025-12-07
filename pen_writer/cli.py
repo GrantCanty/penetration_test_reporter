@@ -16,15 +16,17 @@ app = typer.Typer()
 @app.command()
 def scan(
     target: str,
-    port: Optional[int] = typer.Option(None, "--port", "-p")
+    port: Optional[int] = typer.Option(None, "--port", "-p"),
+    base_path: Optional[str] = typer.Option(None, "--base_path", '-b')
 ) -> None:
     parent_path = Path(Path(__file__).resolve().parent.parent, 'temp_outputs')
     output_dir = datetime.today().strftime('%Y_%m_%d_%H_%M_%S')
+    print(f'base_path in scan function: {base_path}')
     
     if port is not None:
-        res, err = pen_writer.pen_tester_2.scanner(target, parent_path, port, output_dir)
+        res, err = pen_writer.pen_tester_2.scanner(target, parent_path, port, output_dir, base_path)
     else:
-        res, err = pen_writer.pen_tester_2.scanner(target, parent_path, output_dir=output_dir)
+        res, err = pen_writer.pen_tester_2.scanner(target, parent_path, output_dir=output_dir, base_path=base_path)
 
     if err:
         typer.secho(f'Error: {ERRORS[err]}')
