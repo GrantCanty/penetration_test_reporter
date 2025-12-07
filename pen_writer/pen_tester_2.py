@@ -29,7 +29,7 @@ def IPValidation(target):
 # scans target and port if given. logs results to temp_outputs in a unique directory
 def scanner(target, port = None, output_dir = datetime.today().strftime('%Y_%m_%d_%H_%M_%S')):
     # create unique directory to save logs to
-    new_folder = Path(host_output_path, output_dir)
+    '''new_folder = Path(host_output_path, output_dir)
     new_folder.mkdir(parents=True, exist_ok=True)
     
     # check if target is a valid url or IP address
@@ -63,7 +63,7 @@ def scanner(target, port = None, output_dir = datetime.today().strftime('%Y_%m_%
         return None, RESPONSE_ERROR
     except Exception as e:
         print(f'Error when nmap request: {e}')
-        return None, RESPONSE_ERROR
+        return None, RESPONSE_ERROR'''
     
     # common services and commands to try on these services
     NSE_SCRIPT_MAPPING = {
@@ -77,13 +77,15 @@ def scanner(target, port = None, output_dir = datetime.today().strftime('%Y_%m_%
     }
 
     # read open ports from nmap -A command
-    #nmap_A_file_path = '/Users/cheoso/ai_projects/tw3_internship/temp_outputs/2025_12_06_17_41_09/nmap_A_scan_output.xml' # only used for testing
+    nmap_A_file_path = '/Users/cheoso/ai_projects/tw3_internship/temp_outputs/2025_12_06_17_41_09/nmap_A_scan_output.xml' # only used for testing
     open_ports = xml_scan(nmap_A_file_path)
-    for port in open_ports:
-        #print(port, open_ports[port])
-        if open_ports[port]['service'] in NSE_SCRIPT_MAPPING:
-            for command in NSE_SCRIPT_MAPPING[(open_ports[port]['service'])]:
-                print(port, open_ports[port]['service'], command)
+    
+    # commands to perform for each port using its service
+    commands = [
+        item for port in open_ports
+        for item in get_port_and_command(port, open_ports, NSE_SCRIPT_MAPPING)
+    ]
+
         
     return SUCCESS, None
 
@@ -126,5 +128,10 @@ def xml_scan(xml_file_path):
                     ports[port_id] = {'protocol': protocol, 'service': service_name, 'product': product, 'version': version}
             
     return ports
+
+def get_port_and_command(port, open_ports, script_map):
+    service = open_ports[port]['service']
+    if service in script_map:
+        yield from ((port, command) for command in script_map[service])
 
 #scanner('http://scanme.nmap.org')
