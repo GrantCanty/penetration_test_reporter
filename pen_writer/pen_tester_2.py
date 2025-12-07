@@ -147,8 +147,8 @@ def get_port_and_command(port, open_ports, script_map):
         yield from ((port, command) for command in script_map[service])
 
 def run_nmap_sync(ip_addr, port, command, output_dir):
-    file_name = f'{port}_command.txt'
-    subprocess(['nmap', '--script', command, '-p', port, '-oX', f'{output_dir / file_name}', ip_addr])
+    file_name = f'{port}_{command}.xml'
+    subprocess.run(['nmap', '--script', command, '-p', port, '-oX', f'{output_dir / file_name}', ip_addr], capture_output=True, check=True, text=True)
     pass
 
 async def async_scan_worker(executor, ip_addr, port, command, output_dir):
