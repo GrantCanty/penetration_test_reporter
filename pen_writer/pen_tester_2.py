@@ -20,15 +20,6 @@ host_output_path = str(host_output_dir)
 # create temp_outputs folder if it does not exist
 host_output_dir.mkdir(parents=True, exist_ok=True)
 
-# checks to see if target arg is an IP address
-# returns True if yes and False if no
-def IPValidation(target):
-    try:
-        IP(target)
-        return True
-    except Exception:
-        return False
-
 # scans target and port if given. logs results to temp_outputs in a unique directory
 def scanner(target, port = None, output_dir = datetime.today().strftime('%Y_%m_%d_%H_%M_%S')):
     # create unique directory to save logs to
@@ -36,19 +27,7 @@ def scanner(target, port = None, output_dir = datetime.today().strftime('%Y_%m_%
     new_folder.mkdir(parents=True, exist_ok=True)
     
     # check if target is a valid url or IP address
-    #ip_addr = None
-    if validators.url(target):
-        # if valid url, return the ip address
-        ip_addr = ip_lookup(target)
-        if ip_addr is not None:
-            # log the original url and its ip address
-            with open( host_output_dir / new_folder / 'ip_scan.txt', 'a') as f:
-                f.write(f'{target} ip address is: {ip_addr}')
-    elif IPValidation(target):
-        ip_addr = target
-    else:
-        print(f'target given is not valid: {target}')
-        return None, TARGET_ERROR
+    ip_addr, err = validate_target(target, new_folder)
 
     # 1st scan: nmap -A -oX directory ip_addr (optional: -p port )
     # create file name and file path
@@ -57,6 +36,7 @@ def scanner(target, port = None, output_dir = datetime.today().strftime('%Y_%m_%
 
     # try scan with or without port, depending if it was given
     try:
+        print('Performing "nmap -A" scan')
         if port == None:
             subprocess.run(['nmap', '-A', '-oX', nmap_A_file_path, ip_addr], capture_output=True, check=True, text=True)
         else:
@@ -90,18 +70,32 @@ def scanner(target, port = None, output_dir = datetime.today().strftime('%Y_%m_%
     ]
 
     save_dir = host_output_dir / new_folder
+    # run further nmap command async to speed up run time
     res = asyncio.run(run_nmap_async(ip_addr, commands, save_dir))
     print(res)
 
-
-
-
-
-        
     return SUCCESS, None
 
-def ip_lookup(addr):
+def validate_target(target, folder):
+    if validators.url(target):
+        # if valid url, return the ip address
+        ip_addr = ip_lookup(target)
+        if ip_addr is not None:
+            # log the original url and its ip address
+            with open( host_output_dir / folder / 'ip_scan.txt', 'a') as f:
+                f.write(f'{target} ip address is: {ip_addr}')
+            return ip_addr, None
+        return None, TARGET_ERROR
+    elif IPValidation(target):
+        ip_addr = target
+        return ip_addr, None
+    else:
+        print(f'target given is not valid: {target}')
+        return None, TARGET_ERROR
 
+
+def ip_lookup(addr):
+    print('Getting IP address of URL')
     ip_list = []
     ais = socket.getaddrinfo(addr, 0,0,0,0)
     for result in ais:
@@ -109,6 +103,17 @@ def ip_lookup(addr):
         ip_list = list(set(ip_list))
 
     return ip_list[0]
+
+
+# checks to see if target arg is an IP address
+# returns True if yes and False if no
+def IPValidation(target):
+    print('Verifying IP address format')
+    try:
+        IP(target)
+        return True
+    except Exception:
+        return False
 
 
 def xml_scan(xml_file_path):
@@ -140,17 +145,27 @@ def xml_scan(xml_file_path):
             
     return ports
 
+
+# yields the port number from the nmap -A command and the scripts to run on the port number
 def get_port_and_command(port, open_ports, script_map):
     service = open_ports[port]['service']
     if service in script_map:
         yield from ((port, command) for command in script_map[service])
 
+
+# runs a nmap command
 def run_nmap_sync(ip_addr, port, command, output_dir):
+    # defin file name and file path to output the xml payload
     file_name = f'{port}_{command}.xml'
     file_path = f'{output_dir / file_name}'
+
+    # gets parent path so we can access the username and password list
+    # if there is an error when running the command, return RESPONSE_ERROR
+    # if not, return no error
     parent_dir = Path(__file__).resolve().parent.parent
+    print(f'Running "nmap --script {command} on port {port}')
     try:
-        if command != 'ssh-brute':
+        if command != 'ssh-brute': # different command for ssh-brute
             subprocess.run(['nmap', '--script', command, '-p', port, '-oX', file_path, ip_addr], capture_output=True, check=True, text=True)
         else:
             subprocess.run(['nmap', '-p', port, '-oX', file_path, '--script', command, '--script-args', f'userdb={parent_dir /"credentials/cirt-default-usernames.txt"},passdb={parent_dir /"credentials/Pwdb_top-1000.txt"}', ip_addr], capture_output=True, check=True, text=True)
@@ -159,6 +174,7 @@ def run_nmap_sync(ip_addr, port, command, output_dir):
 
     return {'file_path': file_path, 'port': port, 'command': command, 'error': None}
 
+
 async def async_scan_worker(executor, ip_addr, port, command, output_dir):
     # run_in_executor offloads the synchronous subprocess call to a separate thread
     loop = asyncio.get_event_loop()
@@ -166,6 +182,7 @@ async def async_scan_worker(executor, ip_addr, port, command, output_dir):
         executor,
         partial(run_nmap_sync, ip_addr, port, command, output_dir)
     )
+
 
 async def run_nmap_async(ip_addr, commands, output_dir):
     results = []
@@ -181,5 +198,6 @@ async def run_nmap_async(ip_addr, commands, output_dir):
         results.extend(completed_results)
         
     return results
+
 
 #scanner('http://scanme.nmap.org')
