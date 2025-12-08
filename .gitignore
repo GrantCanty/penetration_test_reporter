@@ -5,7 +5,15 @@ main.ipynb
 test.md
 pen_writer/__pycache__
 pen_writer/testing.ipynb
+pen_writer/config.py
+pen_writer/pen_testing.py
 tests/__pycache__
+tests
+outputs
 Nettacker
 temp_outputs/*
 DVWA
+
+*.pdf
+*.ipynb
+*.md

@@ -11,7 +11,6 @@ client = OpenAI(base_url="http://localhost:11434/v1", api_key="EMPTY")
 
 def chat_wrapper(messages, **kwargs):
     response = client.chat.completions.create(
-        #model='qwen3:4B-instruct',
         model='qwen3:4B-instruct',
         messages=messages,
         **kwargs
@@ -53,8 +52,7 @@ def summarize(parent_path, output_dir):
     pdf.add_section(Section(response, toc=False))
     
     print(f'Writing report')
-    report_path = f'{parent_path / output_dir / "report.pdf"}'
-    print(report_path)
+    report_path = f'{parent_path / output_dir / "pen_writer_report.pdf"}'
     pdf.save(report_path)
     print(f'Finished writing report')
     
@@ -68,18 +66,8 @@ def get_files(parent_path, output_dir):
     
     file_dict = {}
     for file in files:
-        #print(file)
         file_content = open( f'{parent_path / output_dir / file}' )
         file_dict[file] = file_content.read()
         file_content.close()
 
     return file_dict, None
-
-#parent_path = Path(Path(__file__).resolve().parent.parent, 'temp_outputs')
-
-#parent_path = Path('/Users', 'cheoso', 'Documents', 'rsa')
-#print(parent_path)
-#summarize(parent_path, '2025_12_07_17_33_03')
-
-#res, err = get_files(Path('/Users', 'cheoso', 'ai_projects', 'tw3_internship', 'temp_outputs'), '2025_12_08_14_53_24')
-#print(res, err)

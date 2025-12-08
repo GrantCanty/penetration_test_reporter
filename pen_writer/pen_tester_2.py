@@ -316,8 +316,6 @@ async def run_nmap_async(ip_addr, commands, output_dir, base_path):
     return results
 
 
-#scanner('http://scanme.nmap.org')
-
 def clean_output(xml_string):
     clean_output = xml_string.replace('&#xa;', '\n').strip()
     lines = clean_output.split('\n')
@@ -340,6 +338,7 @@ def clean_output(xml_string):
             
     return usable_paths
 
+
 def http_enum_xml_scan(xml_file_path):
     tree = ET.parse(xml_file_path)
     root = tree.getroot()
@@ -356,5 +355,5 @@ def http_enum_xml_scan(xml_file_path):
                 # get info from 'output' tag. string of available paths on site
                 output = port_elm.find('script').get('output')
                 
-                # return 
                 return clean_output(output)
+    return None
