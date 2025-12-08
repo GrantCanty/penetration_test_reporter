@@ -13,18 +13,10 @@ from pen_writer import (
     TARGET_ERROR, RESPONSE_ERROR, SUCCESS, __app_name__
 )
 
-'''# create temp_outputs folder path for logging results
-host_output_dir = Path(Path(__file__).resolve().parent.parent, 'temp_outputs')
-host_output_path = str(host_output_dir)
-
-# create temp_outputs folder if it does not exist
-host_output_dir.mkdir(parents=True, exist_ok=True)'''
 
 # scans target and port if given. logs results to temp_outputs in a unique directory
 def scanner(target, parent_path, port = None, output_dir = datetime.today().strftime('%Y_%m_%d_%H_%M_%S'), base_path = None):
     # create temp_outputs folder path for logging results
-    #host_output_dir = Path(Path(__file__).resolve().parent.parent, 'temp_outputs')
-    print(f'base_path in scanner function: {base_path}')
     host_output_path = str(parent_path)
 
     # create temp_outputs folder if it does not exist
@@ -38,47 +30,20 @@ def scanner(target, parent_path, port = None, output_dir = datetime.today().strf
     ip_addr, err = validate_target(target, parent_path, new_folder)
 
     # 1st scan: nmap -A -oX directory ip_addr (optional: -p port )
-    # create file name and file path
-    nmap_A_file_name = 'nmap_A_scan_output.xml'
-    nmap_A_file_path = f'{parent_path / new_folder / nmap_A_file_name}'
-
-    # try scan with or without port, depending if it was given
-    #print(['nmap', '-A', '-oX', nmap_A_file_path, ip_addr])
-    try:
-        print('Performing "nmap -A" scan')
-        if port == None:
-            subprocess.run(['nmap', '-A', '-oX', nmap_A_file_path, ip_addr], capture_output=True, check=True, text=True)
-        else:
-            subprocess.run(['nmap', '-A', '-p', str(port), '-oX', nmap_A_file_path, ip_addr], capture_output=True, check=True, text=True)
-    except subprocess.CalledProcessError as e:
-        print(f'Error when nmap request. Response Code: {e.returncode}')
-        return None, RESPONSE_ERROR
-    except Exception as e:
-        print(f'Error with nmap request: {e}')
-        return None, RESPONSE_ERROR
+    nmap_A_file_path, err = nmap_A_scan(ip_addr, parent_path, new_folder, port)
+    if err:
+        return None, err
     
-    nmap_sV_sC_file_name = 'nmap_sV_sC_output.xml'
-    nmap_sV_sC_file_path = f'{parent_path / new_folder / nmap_sV_sC_file_name}'
-    try:
-        print('Performing "nmap -sV -sC" scan')
-        if port == None:
-            subprocess.run(['nmap', '-oX', nmap_sV_sC_file_path, '-sV', '-sC', ip_addr], capture_output=True, check=True, text=True)
-        else:
-            subprocess.run(['nmap', '-oX', nmap_sV_sC_file_path, '-p', str(port), '-sV', '-sC', ip_addr], capture_output=True, check=True, text=True)
-    except subprocess.CalledProcessError as e:
-        print(f'Error when nmap request. Response Code: {e.returncode}')
-        return None, RESPONSE_ERROR
-    except Exception as e:
-        print(f'Error with nmap request: {e}')
-        return None, RESPONSE_ERROR
-    
-    
+    # 2nd scan: nmap -sV -sC
+    _, err = nmap_sV_sC_scan(ip_addr, parent_path, new_folder, port)
+    if err:
+        return None, err
     
     # common services and commands to try on these services
     NSE_SCRIPT_MAPPING = {
         'http': ['http-methods', 'http-enum', 'http-csrf'],
         'ssl/http': ['ssl-enum-ciphers', 'http-methods', 'http-enum'],
-        'ssh': ['ssh-auth-methods', 'ssh-hostkey', 'ssh-enum-users', 'ssh-brute'],
+        'ssh': ['ssh-auth-methods', 'ssh-hostkey', 'ssh-brute'],
         'smtp': ['smtp-commands', 'smtp-enum-users', 'smtp-vuln-cve2010-4344'],
         'ftp': ['ftp-anon', 'ftp-brute'],
         'mysql': ['mysql-info', 'mysql-brute'],
@@ -87,7 +52,7 @@ def scanner(target, parent_path, port = None, output_dir = datetime.today().strf
 
     # read open ports from nmap -A command
     # nmap_A_file_path = '/Users/cheoso/ai_projects/tw3_internship/temp_outputs/2025_12_06_17_41_09/nmap_A_scan_output.xml' # only used for testing
-    open_ports = xml_scan(nmap_A_file_path)
+    open_ports = nmap_A_xml_scan(nmap_A_file_path)
     
     # commands to perform for each port using its service
     commands = [
@@ -97,8 +62,17 @@ def scanner(target, parent_path, port = None, output_dir = datetime.today().strf
 
     save_dir = parent_path / new_folder
     # run further nmap command async to speed up run time
-    res = asyncio.run(run_nmap_async(ip_addr, commands, save_dir, base_path))
-    # print(res)
+    nmap_async_results = asyncio.run(run_nmap_async(ip_addr, commands, save_dir, base_path))
+    print(nmap_async_results)
+
+    for result in nmap_async_results:
+        #result_info = nmap_async_results[result]
+        if result['command'] == 'http-enum':
+            file_path = result['file_path']
+            http_enum_result = http_enum_xml_scan(file_path)
+            print(http_enum_result)
+
+
 
     return SUCCESS, None
 
@@ -168,7 +142,7 @@ def IPValidation(target):
         return False
 
 
-def xml_scan(xml_file_path):
+def nmap_A_xml_scan(xml_file_path):
     tree = ET.parse(xml_file_path)
     root = tree.getroot()
 
@@ -204,6 +178,47 @@ def get_port_and_command(port, open_ports, script_map):
     if service in script_map:
         yield from ((port, command) for command in script_map[service])
 
+
+def nmap_A_scan(ip_addr, parent_path, new_folder, port = None):
+    nmap_A_file_name = 'nmap_A_scan_output.xml'
+    nmap_A_file_path = f'{parent_path / new_folder / nmap_A_file_name}'
+
+    # try scan with or without port, depending if it was given
+    #print(['nmap', '-A', '-oX', nmap_A_file_path, ip_addr])
+    try:
+        print('Performing "nmap -A" scan')
+        if port == None:
+            subprocess.run(['nmap', '-A', '-oX', nmap_A_file_path, ip_addr], capture_output=True, check=True, text=True)
+        else:
+            subprocess.run(['nmap', '-A', '-p', str(port), '-oX', nmap_A_file_path, ip_addr], capture_output=True, check=True, text=True)
+        print('Finished "nmap -A" scan')
+        return nmap_A_file_path, None
+    except subprocess.CalledProcessError as e:
+        print(f'Error when nmap request. Response Code: {e.returncode}')
+        return None, RESPONSE_ERROR
+    except Exception as e:
+        print(f'Error with nmap request: {e}')
+        return None, RESPONSE_ERROR
+
+def nmap_sV_sC_scan(ip_addr, parent_path, new_folder, port = None):
+    nmap_sV_sC_file_name = 'nmap_sV_sC_output.xml'
+    nmap_sV_sC_file_path = f'{parent_path / new_folder / nmap_sV_sC_file_name}'
+    
+    # try scan with or without port, depending if it was given
+    try:
+        print('Performing "nmap -sV -sC" scan')
+        if port == None:
+            subprocess.run(['nmap', '-oX', nmap_sV_sC_file_path, '-sV', '-sC', ip_addr], capture_output=True, check=True, text=True)
+        else:
+            subprocess.run(['nmap', '-oX', nmap_sV_sC_file_path, '-p', str(port), '-sV', '-sC', ip_addr], capture_output=True, check=True, text=True)
+        print('Finished "nmap -sV -sC" scan')
+        return SUCCESS, None
+    except subprocess.CalledProcessError as e:
+        print(f'Error when nmap request. Response Code: {e.returncode}')
+        return None, RESPONSE_ERROR
+    except Exception as e:
+        print(f'Error with nmap request: {e}')
+        return None, RESPONSE_ERROR
 
 # runs a nmap command
 def run_nmap_sync(ip_addr, port, command, output_dir, base_path):
@@ -275,3 +290,12 @@ async def run_nmap_async(ip_addr, commands, output_dir, base_path):
 
 
 #scanner('http://scanme.nmap.org')
+
+def http_enum_xml_scan(xml_file_path):
+    tree = ET.parse(xml_file_path)
+    root = tree.getroot()
+
+    host_elm = root.find('host')
+
+    if host_elm is not None:
+        return
