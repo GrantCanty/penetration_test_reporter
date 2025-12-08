@@ -65,26 +65,54 @@ def scanner(target, parent_path, port = None, output_dir = datetime.today().strf
     nmap_async_results = asyncio.run(run_nmap_async(ip_addr, commands, save_dir, base_path))
     print(nmap_async_results)
 
+    # put results of http-enum scans into a dict
+    http_enum_result = {}
     for result in nmap_async_results:
-        #result_info = nmap_async_results[result]
         if result['command'] == 'http-enum':
             file_path = result['file_path']
-            http_enum_result = http_enum_xml_scan(file_path)
+            port_no = result['port']
+            http_enum_result[port_no] = http_enum_xml_scan(file_path)
             print(http_enum_result)
 
+    # general attack surfaces for a http-form-brute command
+    brute_attacks = ['login', 'signup', 'admin']
+    # iterate through each port and its path
+    for port, path_list in http_enum_result.items():
+        # iterate through each potential attack keyword
+        for attack_keyword in brute_attacks:
+            # iterate through each path file in the current list
+            for path_file in path_list:
+                print(f'path_file: {path_file} for port: {port}') 
+                # if the attack keyword is a substring of the current path file
+                if attack_keyword in path_file:
+                    script_args = f'http-form-brute.path={path_file}'
+                    
+                    file_name = path_file.replace('/', '_')
+                    file_name = file_name.split('.')[0]
+                    file_name = file_name[1:]
 
+                    subprocess.run(['nmap', '-p', str(port), '--script', 'http-form-brute', '--script-args', script_args, '-oX', f'{save_dir / file_name}.xml', "172.16.147.132"], capture_output=True, check=True, text=True)
 
     return SUCCESS, None
 
 def validate_target(target, parent_path, folder):
+    # remove any leading or trailing white space
     original_target = target.strip()
+    
+    # add http:// if the target starts with any of the folowing
     if not original_target.startswith(('http://', 'https://', 'ftp://')):
         target_for_validation = 'http://' + original_target
     else:
         target_for_validation = original_target
     
-    if validators.url(target_for_validation):
-        # if valid url, return the ip address
+    # check if original target is an ip
+    if IPValidation(target):
+        # if target is valid IP, return the IP address
+        ip_addr = target
+        return ip_addr, None
+    # test if newly built url is valid
+    elif validators.url(target_for_validation):
+        # if valid url, get just the hostname and  return the ip address
         hostname = original_target.split('://', 1)[-1].split('/')[0]
         ip_addr = ip_lookup(hostname)
         if ip_addr is not None:
@@ -93,9 +121,6 @@ def validate_target(target, parent_path, folder):
                 f.write(f'{target} ip address is: {ip_addr}')
             return ip_addr, None
         return None, TARGET_ERROR
-    elif IPValidation(target):
-        ip_addr = target
-        return ip_addr, None
     else:
         print(f'target given is not valid: {target}')
         return None, TARGET_ERROR
@@ -107,11 +132,11 @@ def ip_lookup(addr):
     
     # getaddrinfo expects (hostname, port, ...)
     # port is set to 0, which means any port is acceptable
-    # The last 4 zeros are for family, type, proto, and flags, set to defaults
+    # the last 4 zeros are for family, type, proto, and flags, set to defaults
     try:
         ais = socket.getaddrinfo(addr, 0, 0, 0, 0)
     except socket.gaierror as e:
-        # Better error handling for DNS failure
+        # error handling for DNS failure
         print(f"Error resolving address: {addr}. Reason: {e}")
         return None
 
@@ -119,7 +144,7 @@ def ip_lookup(addr):
         # result[-1][0] extracts the IP address from the socket address tuple
         ip_list.append(result[-1][0])
     
-    # Use a set to get unique IPs, then convert back to a list
+    # use a set to get unique IPs, then convert back to a list
     ip_list = list(set(ip_list))
 
     print(f'Retrieved {len(ip_list)} unique IP address(es) for {addr}')
@@ -150,14 +175,18 @@ def nmap_A_xml_scan(xml_file_path):
 
     ports = {}
 
+    # look for 'host' tag in xml
     if host_elm is not None:
         address = host_elm.find('address').get('addr')
+        
+        # look for 'ports' tag in xml
         ports_element = host_elm.find('ports')
         if ports_element is not None:
             
+            # look at each 'port' tag in xml
             for port_elm in ports_element.findall('port'):
                 state = port_elm.find('state').get('state')
-
+                # check if the port is open and gather info
                 if state == 'open':
                     port_id = port_elm.get('portid')
                     protocol = port_elm.get('protocol')
@@ -166,7 +195,8 @@ def nmap_A_xml_scan(xml_file_path):
                     service_name = serivce_elm.get('name')
                     product = serivce_elm.get('product', 'N/A')
                     version = serivce_elm.get('version', 'N/A')
-
+                    
+                    # add info info from each port to the ports dict
                     ports[port_id] = {'protocol': protocol, 'service': service_name, 'product': product, 'version': version}
             
     return ports
@@ -184,7 +214,6 @@ def nmap_A_scan(ip_addr, parent_path, new_folder, port = None):
     nmap_A_file_path = f'{parent_path / new_folder / nmap_A_file_name}'
 
     # try scan with or without port, depending if it was given
-    #print(['nmap', '-A', '-oX', nmap_A_file_path, ip_addr])
     try:
         print('Performing "nmap -A" scan')
         if port == None:
@@ -227,9 +256,10 @@ def run_nmap_sync(ip_addr, port, command, output_dir, base_path):
     file_path = f'{output_dir / file_name}'
 
     # gets parent path so we can access the username and password list
+    #parent_dir = Path(__file__).resolve().parent.parent
+
     # if there is an error when running the command, return RESPONSE_ERROR
     # if not, return no error
-    parent_dir = Path(__file__).resolve().parent.parent
     print(f'Running "nmap --script {command}" on port {port}')
     try:
         if command == 'http-enum':
@@ -238,7 +268,7 @@ def run_nmap_sync(ip_addr, port, command, output_dir, base_path):
             else:
                 subprocess.run(['nmap', '--script', command, '--script-args', f'http-enum.basepath=/{base_path}/', '-p', port, '-oX', file_path, ip_addr], capture_output=True, check=True, text=True)
         elif command == 'ssh-brute':
-            print()
+            pass # command takes too long to run when testing
             #subprocess.run(['nmap', '-p', port, '-oX', file_path, '--script', command, '--script-args', f'userdb={parent_dir /"credentials/cirt-default-usernames.txt"},passdb={parent_dir /"credentials/Pwdb_top-1000.txt"}', ip_addr], capture_output=True, check=True, text=True)
         else:
             subprocess.run(['nmap', '--script', command, '-p', port, '-oX', file_path, ip_addr], capture_output=True, check=True, text=True)

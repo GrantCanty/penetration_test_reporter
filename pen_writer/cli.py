@@ -21,7 +21,7 @@ def scan(
 ) -> None:
     parent_path = Path(Path(__file__).resolve().parent.parent, 'temp_outputs')
     output_dir = datetime.today().strftime('%Y_%m_%d_%H_%M_%S')
-    print(f'base_path in scan function: {base_path}')
+    print(f'Running scan on target:{target} basepath:{base_path} port:{port}')
     
     if port is not None:
         res, err = pen_writer.pen_tester_2.scanner(target, parent_path, port, output_dir, base_path)
@@ -32,7 +32,11 @@ def scan(
         typer.secho(f'Error: {ERRORS[err]}')
         raise typer.Exit(1)
     
-    pen_writer.summarizer.get_files(parent_path, output_dir)
+    print(f'Completed scan on target:{target} basepath:{base_path} port:{port}')
+
+    print('Generating report')
+    pen_writer.summarizer.summarize(parent_path, output_dir)
+    print('Generated report')
 
 def _version_callback(value: bool) -> None:
     if value:
