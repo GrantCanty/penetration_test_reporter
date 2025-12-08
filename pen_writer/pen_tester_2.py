@@ -29,6 +29,7 @@ def scanner(target, parent_path, port = None, output_dir = datetime.today().strf
     # check if target is a valid url or IP address
     ip_addr, err = validate_target(target, parent_path, new_folder)
 
+    # CONDUCT PRIMARY SCANS
     # 1st scan: nmap -A -oX directory ip_addr (optional: -p port )
     nmap_A_file_path, err = nmap_A_scan(ip_addr, parent_path, new_folder, port)
     if err:
@@ -38,7 +39,9 @@ def scanner(target, parent_path, port = None, output_dir = datetime.today().strf
     _, err = nmap_sV_sC_scan(ip_addr, parent_path, new_folder, port)
     if err:
         return None, err
+    # PRIMARY SCANS ARE FINISHED
     
+    # PREPARE FOR SECONDARY SCANS
     # common services and commands to try on these services
     NSE_SCRIPT_MAPPING = {
         'http': ['http-methods', 'http-enum', 'http-csrf'],
@@ -61,9 +64,10 @@ def scanner(target, parent_path, port = None, output_dir = datetime.today().strf
     ]
 
     save_dir = parent_path / new_folder
+    # PERFORM SECONDARY SCANS
     # run further nmap command async to speed up run time
     nmap_async_results = asyncio.run(run_nmap_async(ip_addr, commands, save_dir, base_path))
-    print(nmap_async_results)
+
 
     # put results of http-enum scans into a dict
     http_enum_result = {}
@@ -73,26 +77,29 @@ def scanner(target, parent_path, port = None, output_dir = datetime.today().strf
             port_no = result['port']
             http_enum_result[port_no] = http_enum_xml_scan(file_path)
             print(http_enum_result)
+    # END OF SECONDARY SCANS
 
+    # PREPARE FOR FINAL SCANS
     # general attack surfaces for a http-form-brute command
     brute_attacks = ['login', 'signup', 'admin']
     # iterate through each port and its path
     for port, path_list in http_enum_result.items():
-        # iterate through each potential attack keyword
-        for attack_keyword in brute_attacks:
-            # iterate through each path file in the current list
-            for path_file in path_list:
-                print(f'path_file: {path_file} for port: {port}') 
-                # if the attack keyword is a substring of the current path file
-                if attack_keyword in path_file:
-                    script_args = f'http-form-brute.path={path_file}'
-                    
-                    file_name = path_file.replace('/', '_')
-                    file_name = file_name.split('.')[0]
-                    file_name = file_name[1:]
+        if path_list is not None:
+            # iterate through each potential attack keyword
+            for attack_keyword in brute_attacks:
+                # iterate through each path file in the current list
+                for path_file in path_list:
+                    print(f'path_file: {path_file} for port: {port}') 
+                    # if the attack keyword is a substring of the current path file
+                    if attack_keyword in path_file:
+                        script_args = f'http-form-brute.path={path_file}'
+                        
+                        file_name = path_file.replace('/', '_')
+                        file_name = file_name.split('.')[0]
+                        file_name = file_name[1:]
 
-                    subprocess.run(['nmap', '-p', str(port), '--script', 'http-form-brute', '--script-args', script_args, '-oX', f'{save_dir / file_name}.xml', "172.16.147.132"], capture_output=True, check=True, text=True)
-
+                        subprocess.run(['nmap', '-p', str(port), '--script', 'http-form-brute', '--script-args', script_args, '-oX', f'{save_dir / file_name}.xml', "172.16.147.132"], capture_output=True, check=True, text=True)
+    # END OF FINAL SCANS
     return SUCCESS, None
 
 def validate_target(target, parent_path, folder):

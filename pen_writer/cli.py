@@ -19,9 +19,10 @@ def scan(
     port: Optional[int] = typer.Option(None, "--port", "-p"),
     base_path: Optional[str] = typer.Option(None, "--base_path", '-b')
 ) -> None:
-    parent_path = Path(Path(__file__).resolve().parent.parent, 'temp_outputs')
+    parent_path = Path(Path(__file__).resolve().parent.parent, 'outputs')
     output_dir = datetime.today().strftime('%Y_%m_%d_%H_%M_%S')
-    print(f'Running scan on target:{target} basepath:{base_path} port:{port}')
+    print(f'Running scans on target:{target} basepath:{base_path} port:{port}')
+    print(f'Results from scans will be saved in {parent_path / output_dir}')
     
     if port is not None:
         res, err = pen_writer.pen_tester_2.scanner(target, parent_path, port, output_dir, base_path)
@@ -32,11 +33,10 @@ def scan(
         typer.secho(f'Error: {ERRORS[err]}')
         raise typer.Exit(1)
     
-    print(f'Completed scan on target:{target} basepath:{base_path} port:{port}')
+    print(f'Completed scans on target:{target} basepath:{base_path} port:{port}')
 
     print('Generating report')
     pen_writer.summarizer.summarize(parent_path, output_dir)
-    print('Generated report')
 
 def _version_callback(value: bool) -> None:
     if value:
