@@ -40,3 +40,15 @@ The program always performs scans in a hierarchical way:
 
 ## Limitations
 It's hard to find super reliable penetration testing sites that let you run commands on from your own terminal. Because of this, the project may be somewhat limited to running on the bWAPP site that I mainly used for testing. I tried to be wary of this, but it is not easy to predict the limitations at times.  
+
+## Main Challenges  
+* LLM Output:
+  * LLM always asks a question at the end of its report. 
+  * LLM generates more than 1 page of content. 
+* Scans:
+  * Dynamic scans based off of xml output is tedious.  
+  * Creating a dict with a list possible scans and If/else statements for the scans is not always reliable. Might not have added a scan or may have missed not defined a service. 
+* Reliable sites for pentesting:  
+  * Most pentesting sites only let you do using a terminal on their own site. Hard to find a reliable way to do the testing from your own computer.  
+* VM Setup:  
+  * Setting up a VM is not always straightforward.  
