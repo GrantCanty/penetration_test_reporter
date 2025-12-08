@@ -232,16 +232,6 @@ def run_nmap_sync(ip_addr, port, command, output_dir, base_path):
     parent_dir = Path(__file__).resolve().parent.parent
     print(f'Running "nmap --script {command}" on port {port}')
     try:
-        """if command != 'ssh-brute' or command != 'http-enum': # different command for ssh-brute
-            subprocess.run(['nmap', '--script', command, '-p', port, '-oX', file_path, ip_addr], capture_output=True, check=True, text=True)
-        elif command == 'http-enum':
-            if base_path == None:
-                subprocess.run(['nmap', '--script', command, '-p', port, '-oX', file_path, ip_addr], capture_output=True, check=True, text=True)
-            else:
-                subprocess.run(['nmap', '--script', command, '--script-args', f'http-enum.basepath=/{base_path}/', '-p', port, '-oX', file_path, ip_addr], capture_output=True, check=True, text=True)
-        #else:
-            #subprocess.run(['nmap', '-p', port, '-oX', file_path, '--script', command, '--script-args', f'userdb={parent_dir /"credentials/cirt-default-usernames.txt"},passdb={parent_dir /"credentials/Pwdb_top-1000.txt"}', ip_addr], capture_output=True, check=True, text=True)"""
-        
         if command == 'http-enum':
             if base_path == None:
                 subprocess.run(['nmap', '--script', command, '-p', port, '-oX', file_path, ip_addr], capture_output=True, check=True, text=True)
@@ -291,11 +281,43 @@ async def run_nmap_async(ip_addr, commands, output_dir, base_path):
 
 #scanner('http://scanme.nmap.org')
 
+def clean_output(xml_string):
+    clean_output = xml_string.replace('&#xa;', '\n').strip()
+    lines = clean_output.split('\n')
+
+    usable_paths = []
+    for line in lines:
+        # strip leading and trailing whitespace from the line
+        cleaned_line = line.strip()
+
+        # split on : and keep text before colon
+        try:
+            path = cleaned_line.split(':')[0].strip()
+            
+            # paths should start with '/'. append if that's the case
+            if path.startswith('/'):
+                usable_paths.append(path)
+                
+        except Exception as e:
+            print(f'Error when cleaning path: {e}')
+            
+    return usable_paths
+
 def http_enum_xml_scan(xml_file_path):
     tree = ET.parse(xml_file_path)
     root = tree.getroot()
 
+    # look for 'host' tag in xml
     host_elm = root.find('host')
 
     if host_elm is not None:
-        return
+        # look for 'ports' tag in xml
+        ports_element = host_elm.find('ports')
+        if ports_element is not None:
+            # look for all 'port' tag
+            for port_elm in ports_element.findall('port'):
+                # get info from 'output' tag. string of available paths on site
+                output = port_elm.find('script').get('output')
+                
+                # return 
+                return clean_output(output)
