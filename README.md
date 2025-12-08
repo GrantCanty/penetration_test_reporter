@@ -12,6 +12,7 @@ How to run the project:
 * Clone the github repo  using `git clone git@github.com:GrantCanty/penetration_test_reporter.git`
 * Create a python virtual environment using `python3 -m venv venv`  
 * Open python virtual environment  
+* Install required packages with `pip install -r requirements.txt`
 * Start ollama in your terminal using `ollama run qwen3:4b`  
 * Scan and generate a report using `python3 -m pen_writer scan <ip or url>` (optional tags: `-b`: base path. ex: `bWAPP` and `-p`: port. ex: `4040`)  
   * a base path should never start with a `/`  
